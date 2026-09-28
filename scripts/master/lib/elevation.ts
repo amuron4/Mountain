@@ -52,12 +52,15 @@ export function parseElevation(raw: string | number | undefined): number | undef
   return n > 0 && n < 4000 ? n : undefined;
 }
 
-/** 「穂高岳（奥穂高岳）」→ 本名と別名に分ける */
+/**
+ * 「穂高岳（奥穂高岳）」「八ヶ岳＜赤岳＞」→ 本名と別名（山頂名など）に分ける。
+ * 国土地理院「日本の主な山岳標高」は「山名＜山頂名＞」「山名よみ＜山頂名よみ＞」の形式。
+ */
 export function splitNames(raw: string): { name: string; alts: string[] } {
   const s = raw.normalize('NFKC').trim();
   const alts: string[] = [];
   const base = s
-    .replace(/[(（]([^)）]+)[)）]/g, (_, inner: string) => {
+    .replace(/[(<〈《]([^)>〉》]+)[)>〉》]/g, (_, inner: string) => {
       alts.push(...inner.split(/[・、,/]/).map((x) => x.trim()).filter(Boolean));
       return '';
     })
@@ -78,8 +81,8 @@ function findKey(keys: string[], patterns: RegExp[]): string | undefined {
 }
 
 const NAME_KEYS = [/^山名$/, /山名(?!.*(読|よみ|ふりがな|かな))/, /^名称$/, /^name$/i];
-const KANA_KEYS = [/読み|よみ|ふりがな|フリガナ|かな/, /^kana$/i];
-const ELEV_KEYS = [/標高/, /^(elevation|alt|altitude)$/i];
+const KANA_KEYS = [/読み|よみ|ふりがな|フリガナ|かな/, /^(kana|yomi)$/i];
+const ELEV_KEYS = [/標高/, /^(elevation|ele|alt|altitude)$/i];
 const LAT_KEYS = [/緯度/, /^lat(itude)?$/i];
 const LON_KEYS = [/経度/, /^(lon|lng|longitude)$/i];
 
@@ -104,12 +107,14 @@ function rowToPoint(get: (k: string) => string | number | undefined, keys: strin
   if (!name || elevationM === undefined || lat === undefined || lon === undefined) return undefined;
   if (lat < 20 || lat > 46 || lon < 122 || lon > 154) return undefined;
   const kk = findKey(keys, KANA_KEYS);
-  const kana = kk ? String(get(kk) ?? '').trim() || undefined : undefined;
-  return { name, altNames: alts, kana, lat, lon, elevationM };
+  // 読みも「山名よみ＜山頂名よみ＞」形式なので分けて、山頂名の読みも照合に使う
+  const kanaParts = kk ? splitNames(String(get(kk) ?? '')) : { name: '', alts: [] };
+  const kana = kanaParts.name || undefined;
+  return { name, altNames: [...alts, ...kanaParts.alts], kana, lat, lon, elevationM };
 }
 
 /** CSV（UTF-8 / Shift_JIS）または GeoJSON を読み込む。ヘッダー行が先頭でない CSV にも対応 */
-export function parseElevationFile(buf: Uint8Array, fileName: string): { points: ElevationPoint[]; skipped: number } {
+export function parseElevationFile(buf: Uint8Array, fileName: string): { points: ElevationPoint[]; skipped: number; hasCoordinates: boolean } {
   const text = decodeText(buf);
   if (/\.(geo)?json$/i.test(fileName)) {
     const json = JSON.parse(text) as { features?: { properties?: Record<string, unknown>; geometry?: { type: string; coordinates: number[] } }[] };
@@ -122,12 +127,15 @@ export function parseElevationFile(buf: Uint8Array, fileName: string): { points:
       if (p) points.push(p);
       else skipped++;
     }
-    return { points, skipped };
+    return { points, skipped, hasCoordinates: true };
   }
   const rows = parseCsv(text);
   const headerIdx = rows.findIndex((r) => findKey(r, NAME_KEYS) && findKey(r, ELEV_KEYS));
   if (headerIdx < 0) throw new Error('標高データの列（山名・標高）を判定できませんでした');
   const header = rows[headerIdx].map((h) => h.trim());
+  // 座標の列が無い CSV は、名前だけの突合になってしまうため使わない（GeoJSON 版を使う）
+  const hasCoordinates = !!findKey(header, LAT_KEYS) && !!findKey(header, LON_KEYS);
+  if (!hasCoordinates) return { points: [], skipped: rows.length - headerIdx - 1, hasCoordinates };
   const points: ElevationPoint[] = [];
   let skipped = 0;
   for (const r of rows.slice(headerIdx + 1)) {
@@ -135,7 +143,7 @@ export function parseElevationFile(buf: Uint8Array, fileName: string): { points:
     if (p) points.push(p);
     else skipped++;
   }
-  return { points, skipped };
+  return { points, skipped, hasCoordinates };
 }
 
 // ---------------------------------------------------------------------------

@@ -29,7 +29,10 @@ import { findCsvLinks, OFFICIAL_PAGE_URL } from './lib/official';
 import { TileFetcher } from './lib/tileFetcher';
 
 const RAW_DIR = join(ROOT, 'data/raw');
+/** 自動取得したファイルのキャッシュ（コミットしない） */
 const OFFICIAL_DIR = join(RAW_DIR, 'elevation');
+/** 手動でダウンロードした公式ファイルを置く場所（コミットできる。ネットワーク無しで突合できる） */
+const OFFICIAL_COMMITTED_DIR = join(ROOT, 'data/official');
 const DEM_CACHE = join(RAW_DIR, 'dem');
 const USER_AGENT = 'yama-note-master-elevation/1.0 (+https://github.com/amuron4/Mountain; batch job, cached, rate-limited)';
 
@@ -64,7 +67,8 @@ const sha256 = (buf: Uint8Array) => createHash('sha256').update(buf).digest('hex
 
 /** 公式山岳標高ファイル: ローカルにあればそれ、無ければ公式ページから CSV を探して1回だけ取得 */
 async function loadOfficial(args: Args): Promise<{ points: ElevationPoint[]; file?: string; sha?: string }> {
-  const local = existsSync(OFFICIAL_DIR) ? readdirSync(OFFICIAL_DIR).filter((f) => /\.(csv|geojson|json)$/i.test(f)).sort() : [];
+  const list = (dir: string) => (existsSync(dir) ? readdirSync(dir).filter((f) => /\.(csv|geojson|json)$/i.test(f)).sort().map((f) => join(dir, f)) : []);
+  const local = [...list(OFFICIAL_COMMITTED_DIR), ...list(OFFICIAL_DIR)];
   if (!local.length && !args.offline) {
     try {
       console.log(`公式山岳標高: ${OFFICIAL_PAGE_URL} から CSV のリンクを探します`);
@@ -81,7 +85,7 @@ async function loadOfficial(args: Args): Promise<{ points: ElevationPoint[]; fil
       mkdirSync(OFFICIAL_DIR, { recursive: true });
       const name = decodeURIComponent(new URL(link.url).pathname.split('/').pop() ?? 'gsi-sangaku.csv');
       writeFileSync(join(OFFICIAL_DIR, name), csv);
-      local.push(name);
+      local.push(join(OFFICIAL_DIR, name));
       console.log(`  取得: ${link.text || name}（${(csv.length / 1024).toFixed(0)}KB）→ data/raw/elevation/${name}`);
     } catch (e) {
       console.warn(`  公式山岳標高を取得できませんでした（${(e as Error).message}）。DEM のみで補完します`);
@@ -89,15 +93,22 @@ async function loadOfficial(args: Args): Promise<{ points: ElevationPoint[]; fil
   }
   const points: ElevationPoint[] = [];
   const shas: string[] = [];
-  for (const f of local) {
-    const buf = new Uint8Array(readFileSync(join(OFFICIAL_DIR, f)));
-    const { points: ps, skipped } = parseElevationFile(buf, f);
-    console.log(`  公式山岳標高 ${f}: ${ps.length}地点（読めない行 ${skipped}）`);
+  const used: string[] = [];
+  for (const path of local) {
+    const buf = new Uint8Array(readFileSync(path));
+    const name = path.slice(ROOT.length + 1);
+    const { points: ps, skipped, hasCoordinates } = parseElevationFile(buf, path);
+    if (!hasCoordinates) {
+      console.warn(`  ⚠ ${name}: 緯度・経度の列が無いため使いません（名前だけでは突合しない）。座標付きの GeoJSON 版を使ってください`);
+      continue;
+    }
+    console.log(`  公式山岳標高 ${name}: ${ps.length}地点（読めない行 ${skipped}）`);
     points.push(...ps);
     shas.push(sha256(buf));
+    used.push(name);
   }
-  if (local.length && points.length < 100) throw new Error('公式山岳標高ファイルの読み込み結果が少なすぎます。ファイル形式を確認してください');
-  return { points, file: local.join(', ') || undefined, sha: shas.join(',') || undefined };
+  if (used.length && points.length < 100) throw new Error('公式山岳標高ファイルの読み込み結果が少なすぎます。ファイル形式を確認してください');
+  return { points, file: used.join(', ') || undefined, sha: shas.join(',') || undefined };
 }
 
 /** 代表的な山の検証（公表値との差が大きいものを警告する。公表値はこの検証表示にだけ使い、データには入れない） */

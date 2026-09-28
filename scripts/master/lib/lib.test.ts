@@ -158,3 +158,27 @@ describe('elevation matching (never by name alone)', () => {
     expect(r.ambiguous).toBe(1);
   });
 });
+
+describe('日本の主な山岳標高の形式（山名＜山頂名＞）', () => {
+  it('splits angle-bracket summit names and readings, and matches by summit name', () => {
+    expect(splitNames('八ヶ岳＜赤岳＞')).toEqual({ name: '八ヶ岳', alts: ['赤岳'] });
+    expect(splitNames('谷川岳<オキノ耳>')).toEqual({ name: '谷川岳', alts: ['オキノ耳'] });
+    const gj = {
+      type: 'FeatureCollection',
+      features: [{ properties: { '山名<山頂名>': '八ヶ岳＜赤岳＞', '山名よみ<山頂名よみ>': 'やつがたけ＜あかだけ＞', 標高値: '2899.4' }, geometry: { type: 'Point', coordinates: [138.37025, 35.97082] } }],
+    };
+    const { points, hasCoordinates } = parseElevationFile(new TextEncoder().encode(JSON.stringify(gj)), 'sangaku.geojson');
+    expect(hasCoordinates).toBe(true);
+    expect(points[0]).toMatchObject({ name: '八ヶ岳', kana: 'やつがたけ', elevationM: 2899.4 });
+    expect(points[0].altNames).toEqual(['赤岳', 'あかだけ']);
+    const r = matchElevations(points, [{ id: 'aka', name: '赤岳', kana: 'あかだけ', aliases: [], lat: 35.970893, lon: 138.370208 }], { maxDistanceM: 150 });
+    expect(r.elevations.get('aka')).toBe(2899.4);
+  });
+
+  it('refuses a CSV without coordinates (would be name-only matching)', () => {
+    const csv = '連番,山名<山頂名>,山名よみ<山頂名よみ>,標高値,都道府県\n1,武甲山,ぶこうさん,1304,埼玉県\n';
+    const r = parseElevationFile(new TextEncoder().encode(csv), 'x.csv');
+    expect(r.hasCoordinates).toBe(false);
+    expect(r.points).toHaveLength(0);
+  });
+});
