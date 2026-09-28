@@ -34,6 +34,22 @@ npm run preview    # ビルド結果を http://localhost:4173 で配信（Servic
 - スマホで使うときは、公開した URL を開いて **ホーム画面に追加**（iPhone: Safari の共有 →「ホーム画面に追加」、Android: Chrome のメニュー →「アプリをインストール」）。
 - 初回起動時に「サンプルデータで試す」を押すと、16座・8件の山行記録で操作感を確認できます（設定からいつでも一括削除可能）。
 
+### スマホで使う（GitHub Pages で公開）
+
+`.github/workflows/deploy.yml` が、プッシュのたびにテスト → ビルド → GitHub Pages への公開を行います。
+
+1. リポジトリの **Settings → Pages → Build and deployment → Source** を **「GitHub Actions」** にする（初回のみ）
+   - 非公開（private）リポジトリで Pages を使うには GitHub Pro 以上が必要です。無料プランの場合はリポジトリを公開にするか、下の別サービスを使ってください（コードにはサンプルしか含まれず、自分の登山データは端末内にだけ保存されるので、公開してもデータは漏れません）
+2. **Actions → Deploy to GitHub Pages → Run workflow**（またはブランチにプッシュ）
+3. 公開 URL（例: `https://<ユーザー名>.github.io/Mountain/`）をスマホで開き、**ホーム画面に追加**
+   - iPhone: Safari で開く → 共有ボタン →「ホーム画面に追加」
+   - Android: Chrome で開く → メニュー →「アプリをインストール」/「ホーム画面に追加」
+
+一度開けば Service Worker がアプリ本体をキャッシュするので、山の中など電波がない場所でも起動できます。
+Netlify / Cloudflare Pages / Vercel でも「ビルドコマンド `npm run build`、公開ディレクトリ `dist`」でそのまま公開できます（private リポジトリでも無料）。
+
+> 補足: データはスマホのブラウザ内に保存されます。PC とスマホでは別々のデータになるので、移したいときは JSON エクスポート → インポートを使ってください。iPhone では「Safari で開いたページ」と「ホーム画面に追加したアプリ」の保存領域が別になるため、使い始める前にホーム画面に追加しておくのがおすすめです。
+
 ### テスト
 
 ```bash
@@ -117,6 +133,7 @@ npm run icons             # public/icons/icon.svg から PWA 用 PNG を再生�
 index.html                 エントリ HTML（テーマのちらつき防止スクリプト含む）
 vite.config.ts             ビルド設定（Service Worker 生成プラグイン含む）
 playwright.config.ts       E2E テスト設定（iPhone 13 相当）
+.github/workflows/deploy.yml  GitHub Pages への自動公開
 public/                    manifest・アイコン
 scripts/gen-icons.mjs      SVG → PNG アイコン生成
 e2e/                       ブラウザ E2E テスト
