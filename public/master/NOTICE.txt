@@ -1,0 +1,40 @@
+山ノート 山名データ（public/master/*.json）の出典・ライセンス
+
+本データは参考情報です。登山計画には必ず最新の公式地図・現地情報で再確認してください。
+
+■ 山名・読み・位置: 国土地理院ベクトルタイル（注記）
+  出典: 国土地理院ベクトルタイル提供実験（注記データ）を加工して作成。抽出: anineco/GSI-VectorTile-MountainDB（MIT License）
+  ライセンス: 国土地理院コンテンツ利用規約（CC BY 4.0 互換）／抽出データ・スクリプト: MIT License (c) 2025 Nyanta Anineco
+  版: anineco/GSI-VectorTile-MountainDB@ec14a76 gsi_summits.csv
+  URL: https://github.com/anineco/GSI-VectorTile-MountainDB
+
+■ 都道府県の判定: 国土数値情報（行政区域データ）
+  出典: 「国土数値情報（行政区域データ）」（国土交通省）をスマートニュース メディア研究所が加工したデータ（smartnews-smri/japan-topography）を加工して作成
+  ライセンス: 国土数値情報の利用規約に従う（出典の明記が必要）
+  版: smartnews-smri/japan-topography@b403e71 N03-21（令和3年）簡素化1%
+  URL: https://github.com/smartnews-smri/japan-topography
+  注記: 県境から 400m 以内の山は隣県も所在地に含める。境界は簡略化データのため、県境付近の判定は目安。
+
+■ anineco/GSI-VectorTile-MountainDB の LICENSE
+
+MIT License
+
+Copyright (c) 2025 Nyanta Anineco
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

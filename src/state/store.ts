@@ -7,6 +7,8 @@ import { backupsToPrune, makeSnapshot, shouldAutoBackup } from '../data/backup';
 import { DEFAULT_SETTINGS, mergeDatasets, parseExport, repairReferences, serializeDataset, type MergeReport } from '../data/exportImport';
 import type { Repository } from '../data/repository';
 import { buildSampleData, isSample } from '../data/sample';
+import { linkMountainToMaster, mountainFromMaster, RegisteredLookup } from '../domain/master/link';
+import type { MountainMaster } from '../domain/master/types';
 import { buildMountainViews, personalPace, statusAfterRecord, type MountainView } from '../domain/mountain';
 import { PRESET_VERSION } from '../domain/presets';
 import { buildTagIndex, missingPresets, planTagRemoval, type TagIndex } from '../domain/tags';
@@ -119,6 +121,24 @@ export class AppStore {
     const saved = { ...m, name: m.name.trim(), updatedAt: nowIso() };
     await this.commit({ put: { mountains: [saved] } });
     return saved;
+  }
+
+  /**
+   * 山マスターの山を自分の山として登録する（ワンタップ登録）。
+   * 既に同じ山（masterId 一致、または近接＋同名）が登録済みなら新規作成せず、それを返す。
+   */
+  async registerFromMaster(master: MountainMaster): Promise<{ mountain: Mountain; created: boolean }> {
+    const existing = new RegisteredLookup(this.data.mountains).find(master);
+    if (existing) return { mountain: existing, created: false };
+    const mountain = await this.saveMountain(mountainFromMaster(master));
+    return { mountain, created: true };
+  }
+
+  /** 既存の山（手入力で位置なし）を山マスターに紐づける。入力済みの値は保持し、空欄だけ補う */
+  async linkToMaster(mountainId: ID, master: MountainMaster): Promise<Mountain | undefined> {
+    const m = this.derived.mountainById.get(mountainId);
+    if (!m) return undefined;
+    return this.saveMountain(linkMountainToMaster(m, master));
   }
 
   async patchMountain(id: ID, patch: Partial<Mountain>): Promise<void> {

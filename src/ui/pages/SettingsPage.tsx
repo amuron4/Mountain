@@ -9,6 +9,67 @@ import { Card, PageHeader, Segmented } from '../components/common';
 import { Toggle } from '../components/fields';
 import { Icon } from '../components/Icon';
 import { confirmDialog, Sheet, toast } from '../components/overlay';
+import { loadMaster, useMaster } from '../../state/master';
+
+/** 山名データ（山マスター）の出典・ライセンス・注意事項 */
+function MasterAboutSheet({ onClose }: { onClose: () => void }) {
+  const master = useMaster();
+  const man = master.manifest;
+  return (
+    <Sheet title="山名データについて" onClose={onClose} full testId="master-about">
+      <div class="warn-box">
+        山名・位置・所在都道府県・標高は<b>参考情報</b>です。県境付近の都道府県判定は簡略化した境界データによる目安で、誤りを含む可能性があります。
+        <b>登山計画には必ず最新の公式地図（地理院地図など）や現地情報で再確認</b>してください。
+      </div>
+      {master.status === 'loading' && <div class="hint">読み込み中…</div>}
+      {master.status === 'error' && <div class="warn-box">山名データを読み込めませんでした（{master.error}）</div>}
+      {man && (
+        <>
+          <dl class="kv card flat">
+            <dt>収録数</dt>
+            <dd>
+              {man.total.toLocaleString()}座（対象 {man.prefectures.length}都県）
+            </dd>
+            <dt>標高</dt>
+            <dd>
+              {man.withElevation.toLocaleString()}座で取得済み・{(man.total - man.withElevation).toLocaleString()}座は不明
+              <div class="hint">信頼できる標高データと座標・山名で確実に突合できたものだけを表示します（推測値は表示しません）。</div>
+            </dd>
+            <dt>データ版</dt>
+            <dd>
+              <span class="num">{man.version}</span>（{man.generatedAt.slice(0, 10)} 生成）
+            </dd>
+            <dt>対象</dt>
+            <dd>{man.prefectures.join('・')}</dd>
+          </dl>
+          {man.sources.map((src) => (
+            <section class="card flat" key={src.key} data-testid="master-source">
+              <h3 style={{ fontSize: '15px', marginBottom: '6px' }}>{src.title}</h3>
+              <dl class="kv">
+                <dt>出典</dt>
+                <dd>{src.credit}</dd>
+                <dt>ライセンス</dt>
+                <dd>{src.license}</dd>
+                <dt>版</dt>
+                <dd class="small">{src.version}</dd>
+                <dt>URL</dt>
+                <dd>
+                  <a href={src.url} target="_blank" rel="noopener noreferrer">
+                    {src.url}
+                  </a>
+                </dd>
+              </dl>
+              {src.note && <div class="hint" style={{ marginTop: '6px' }}>{src.note}</div>}
+            </section>
+          ))}
+          <div class="hint">
+            山名データは端末内にキャッシュされ、オフラインでも検索できます。自分の山として登録したデータは、元の山名データとは別に保存され、自由に編集できます。詳細はリポジトリの NOTICE.md を参照してください。
+          </div>
+        </>
+      )}
+    </Sheet>
+  );
+}
 
 function downloadText(text: string, filename: string) {
   const blob = new Blob([text], { type: 'application/json' });
@@ -109,7 +170,8 @@ function ImportSheet({ text, parsed, fileName, onClose }: { text: string; parsed
   );
 }
 
-export function SettingsPage() {
+export function SettingsPage({ openAbout = false }: { openAbout?: boolean }) {
+  const [aboutOpen, setAboutOpen] = useState(openAbout);
   const store = useStore();
   const s = store.state.settings;
   const [backups, setBackups] = useState<BackupSnapshot[]>([]);
@@ -243,6 +305,23 @@ export function SettingsPage() {
           <div class="hint">端末内バックアップはブラウザのデータ削除で一緒に消えます。大切なデータはJSONエクスポートも併用してください。</div>
         </Card>
 
+        <Card title="山名データについて" icon="🗾" testId="master-card">
+          <div class="hint" style={{ marginBottom: '8px' }}>
+            「山を探す」や山名の入力候補に使う、国土地理院の山名データ（出典・ライセンス・注意事項）。
+          </div>
+          <button
+            class="btn block"
+            onClick={() => {
+              void loadMaster();
+              setAboutOpen(true);
+            }}
+            data-testid="open-master-about"
+          >
+            出典・ライセンスを見る
+            <Icon name="right" size={18} />
+          </button>
+        </Card>
+
         <Card title="タグ・カテゴリ" icon="🏷️">
           <a class="btn block" href="#/settings/tags">
             タグとカテゴリを管理
@@ -348,6 +427,7 @@ export function SettingsPage() {
           </div>
         </Card>
       </div>
+      {aboutOpen && <MasterAboutSheet onClose={() => setAboutOpen(false)} />}
       {importing && (
         <ImportSheet
           {...importing}

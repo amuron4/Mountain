@@ -68,6 +68,16 @@ export function MountainDetailPage({ id }: { id: string }) {
               {m.kana && <div class="kana">{m.kana}</div>}
               <h2>{m.name}</h2>
               <div class="place">{[m.region, m.prefectures.join('・'), m.range].filter(Boolean).join(' / ') || '地域未設定'}</div>
+              {m.location && (
+                <div class="place small" data-testid="mountain-location">
+                  📍 <span class="num">{m.location.lat.toFixed(4)}, {m.location.lng.toFixed(4)}</span>
+                  {' ・ '}
+                  <a href={`https://maps.gsi.go.jp/#15/${m.location.lat}/${m.location.lng}/`} target="_blank" rel="noopener noreferrer">
+                    地理院地図
+                  </a>
+                  {m.masterId && <span class="muted">（山名データより）</span>}
+                </div>
+              )}
             </div>
             <div class="elev-big num">
               {m.elevationM !== undefined ? m.elevationM.toLocaleString() : '—'}

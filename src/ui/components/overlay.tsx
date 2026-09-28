@@ -3,7 +3,8 @@
  * toast() / confirmDialog() はどこからでも呼べる（App 直下の <Overlays /> が描画する）。
  */
 import type { ComponentChildren } from 'preact';
-import { useCallback, useEffect, useState } from 'preact/hooks';
+import { useEffect } from 'preact/hooks';
+import { useExternalStore } from '../../state/hooks';
 import { Icon } from './Icon';
 
 interface ToastState {
@@ -25,7 +26,11 @@ let toastState: ToastState | null = null;
 let confirmState: ConfirmState | null = null;
 let seq = 0;
 const listeners = new Set<() => void>();
-const emit = () => listeners.forEach((fn) => fn());
+let version = 0;
+const emit = () => {
+  version++;
+  listeners.forEach((fn) => fn());
+};
 
 export function toast(text: string, kind: ToastState['kind'] = 'info') {
   const id = ++seq;
@@ -60,15 +65,15 @@ function closeConfirm(v: boolean) {
   c?.resolve(v);
 }
 
+const subscribeOverlay = (fn: () => void) => {
+  listeners.add(fn);
+  return () => {
+    listeners.delete(fn);
+  };
+};
+
 export function Overlays() {
-  const [, setTick] = useState(0);
-  const force = useCallback(() => setTick((x) => x + 1), []);
-  useEffect(() => {
-    listeners.add(force);
-    return () => {
-      listeners.delete(force);
-    };
-  }, []);
+  useExternalStore(subscribeOverlay, () => version);
   return (
     <>
       {toastState && (

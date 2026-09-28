@@ -1,5 +1,7 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useMemo, useState } from 'preact/hooks';
 import { RANGE_SUGGESTIONS, REGIONS, regionOfPrefecture } from '../../domain/geo';
+import { masterToMountainFields, RegisteredLookup } from '../../domain/master/link';
+import type { MountainMaster } from '../../domain/master/types';
 import { createCourse, createMountain, STATUS_LABEL } from '../../domain/mountain';
 import type { Course, Mountain, MountainStatus } from '../../domain/types';
 import { uniq } from '../../domain/util';
@@ -8,7 +10,9 @@ import { goBack, navigate } from '../../state/router';
 import { Empty, Fold, PageHeader, Segmented } from '../components/common';
 import { DurationField, NumberField, PrefecturePicker, RatingsEditor, TextArea, TextField, Toggle, WishInput } from '../components/fields';
 import { Icon } from '../components/Icon';
-import { toast } from '../components/overlay';
+import { MasterSuggest } from '../components/master';
+import { confirmDialog, toast } from '../components/overlay';
+import { useMaster } from '../../state/master';
 import { TagPicker } from '../components/tags';
 
 function CourseEditor({ course, index, onChange, onRemove, onMakePrimary }: { course: Course; index: number; onChange: (c: Course) => void; onRemove: () => void; onMakePrimary?: () => void }) {
@@ -44,14 +48,50 @@ function CourseEditor({ course, index, onChange, onRemove, onMakePrimary }: { co
   );
 }
 
-export function MountainFormPage({ id }: { id?: string }) {
+export function MountainFormPage({ id, masterId }: { id?: string; masterId?: string }) {
   const store = useStore();
   const existing = id ? store.derived.mountainById.get(id) : undefined;
   const [m, setM] = useState<Mountain>(() => (existing ? structuredClone(existing) : createMountain({ courses: [createCourse()] })));
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  // 山名オートコンプリート（新規登録時のみ。候補を選んだら閉じる）
+  const [suggestOpen, setSuggestOpen] = useState(false);
+  const [picked, setPicked] = useState<MountainMaster | undefined>();
+  const master = useMaster(!existing);
+  const lookup = useMemo(() => new RegisteredLookup(store.state.mountains.filter((x) => x.id !== m.id)), [store.state.mountains, m.id]);
   const set = (patch: Partial<Mountain>) => setM((cur) => ({ ...cur, ...patch }));
   const ranges = uniq([...store.state.mountains.map((x) => x.range).filter(Boolean), ...RANGE_SUGGESTIONS]);
+
+  const applyMaster = (mm: MountainMaster) => {
+    setM((cur) => ({ ...cur, ...masterToMountainFields(mm) }));
+    setPicked(mm);
+    setSuggestOpen(false);
+    setError('');
+  };
+
+  const pickMaster = async (mm: MountainMaster) => {
+    const dup = lookup.find(mm);
+    if (dup) {
+      setSuggestOpen(false);
+      const open = await confirmDialog({
+        title: `「${dup.name}」は登録済みです`,
+        message: `${mm.prefectures.join('・')}の${mm.name}は、すでに自分の山に登録されています。\n登録済みの山を開きますか？`,
+        okLabel: '登録済みの山を開く',
+        cancelLabel: '閉じる',
+      });
+      if (open) navigate(`/mountains/${dup.id}`, { replace: true });
+      return;
+    }
+    applyMaster(mm);
+  };
+
+  // 「山を探す」から ?master=ID で来た場合はフォームへ流し込む
+  useEffect(() => {
+    if (!masterId || existing || picked || !master.index) return;
+    const mm = master.index.byId(masterId);
+    if (mm) void pickMaster(mm);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [masterId, master.index]);
 
   if (id && !existing) {
     return (
@@ -73,8 +113,16 @@ export function MountainFormPage({ id }: { id?: string }) {
       document.querySelector<HTMLInputElement>('input[name="name"]')?.focus();
       return;
     }
+    if (!existing && picked) {
+      const same = lookup.find(picked);
+      if (same) {
+        toast(`「${same.name}」は既に登録されています`, 'error');
+        navigate(`/mountains/${same.id}`, { replace: true });
+        return;
+      }
+    }
     const dup = store.state.mountains.find((x) => x.id !== m.id && x.name.trim() === m.name.trim() && (x.prefectures[0] ?? '') === (m.prefectures[0] ?? ''));
-    if (dup && !existing) {
+    if (dup && !existing && !picked) {
       // 同名の山は各地にあるので保存は許可し、気付けるように知らせるだけ
       toast(`同じ名前の山「${dup.name}」が既にあります`);
     }
@@ -96,11 +144,72 @@ export function MountainFormPage({ id }: { id?: string }) {
       <PageHeader title={existing ? `${existing.name}を編集` : '山を登録'} back={existing ? `/mountains/${existing.id}` : '/mountains'} />
       <form class="page form" onSubmit={save} data-testid="mountain-form">
         <Fold title="基本情報" icon="⛰️" open>
-          <TextField label="山名" required name="name" value={m.name} onInput={(v) => (set({ name: v }), setError(''))} placeholder="例: 蛭ヶ岳" />
+          <div class="field">
+            <label for="mountain-name">
+              山名<span class="req">*</span>
+            </label>
+            <input
+              id="mountain-name"
+              name="name"
+              class="input"
+              value={m.name}
+              placeholder={existing ? '例: 蛭ヶ岳' : '山名・よみを入力すると候補が出ます'}
+              autoComplete="off"
+              enterKeyHint="done"
+              aria-autocomplete={existing ? undefined : 'list'}
+              onInput={(e) => {
+                set({ name: (e.target as HTMLInputElement).value });
+                setError('');
+                if (!existing) setSuggestOpen(true);
+              }}
+              onFocus={() => !existing && !picked && m.name && setSuggestOpen(true)}
+              onKeyDown={(e) => e.key === 'Escape' && setSuggestOpen(false)}
+            />
+            {suggestOpen && !existing && <MasterSuggest query={m.name} onPick={pickMaster} />}
+            {suggestOpen && !existing && m.name.trim() && (
+              <button type="button" class="btn small ghost" onClick={() => setSuggestOpen(false)} style={{ alignSelf: 'flex-end' }}>
+                候補を閉じる（手入力で登録）
+              </button>
+            )}
+          </div>
           {error && <div class="error-text">{error}</div>}
+          {m.masterId && (
+            <div class="info-box master-link" data-testid="master-linked">
+              <div>
+                <b>山名データから入力</b>（国土地理院の山名注記）
+                {m.location && (
+                  <div class="small">
+                    位置: <span class="num">{m.location.lat.toFixed(5)}, {m.location.lng.toFixed(5)}</span>
+                    {' ・ '}
+                    <a href={`https://maps.gsi.go.jp/#15/${m.location.lat}/${m.location.lng}/`} target="_blank" rel="noopener noreferrer">
+                      地理院地図で確認
+                    </a>
+                  </div>
+                )}
+                {picked && picked.elevationM === undefined && <div class="small">標高は出典データに無いため空欄です。分かれば入力してください。</div>}
+                {picked && !existing && lookup.findSimilarUnlocated(picked) && (
+                  <div class="small" data-testid="similar-warning">
+                    ⚠️ 同じ名前の「{lookup.findSimilarUnlocated(picked)!.name}」が登録済みです（位置情報なし）。同じ山なら
+                    <a href={`#/mountains?tab=search`}>「山を探す」</a>から紐づけできます。
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                class="btn small ghost"
+                onClick={() => {
+                  // 位置は山名データ由来なので一緒に外す（別の山を選び直せるように）
+                  set({ masterId: undefined, location: undefined });
+                  setPicked(undefined);
+                }}
+              >
+                紐づけ解除
+              </button>
+            </div>
+          )}
           <div class="grid-2">
-            <TextField label="読み" name="kana" value={m.kana} onInput={(v) => set({ kana: v })} placeholder="ひるがたけ" />
-            <NumberField label="標高" unit="m" name="elevation" value={m.elevationM} onChange={(v) => set({ elevationM: v })} placeholder="1673" />
+            <TextField label="読み" name="kana" value={m.kana} onInput={(v) => set({ kana: v })} placeholder="例: ひるがたけ" />
+            <NumberField label="標高" unit="m" name="elevation" value={m.elevationM} onChange={(v) => set({ elevationM: v })} placeholder="例: 1673" />
           </div>
           <PrefecturePicker
             value={m.prefectures}
@@ -118,7 +227,7 @@ export function MountainFormPage({ id }: { id?: string }) {
                 ))}
               </select>
             </div>
-            <TextField label="山域" name="range" value={m.range} onInput={(v) => set({ range: v })} placeholder="丹沢" list="range-list" />
+            <TextField label="山域" name="range" value={m.range} onInput={(v) => set({ range: v })} placeholder="例: 丹沢" list="range-list" />
           </div>
           <datalist id="range-list">
             {ranges.map((r) => (

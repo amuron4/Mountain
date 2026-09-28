@@ -30,9 +30,9 @@ function Page({ route }: { route: Route }) {
     case 'home':
       return <HomePage />;
     case 'mountains':
-      return <MountainListPage />;
+      return <MountainListPage initialTab={route.query.get('tab') === 'search' ? 'search' : undefined} />;
     case 'mountainNew':
-      return <MountainFormPage />;
+      return <MountainFormPage masterId={route.query.get('master') ?? undefined} />;
     case 'mountainEdit':
       return <MountainFormPage id={route.params.id} />;
     case 'mountain':
@@ -50,7 +50,7 @@ function Page({ route }: { route: Route }) {
     case 'today':
       return <TodayPage initialMoods={route.query.get('moods')?.split(',').filter(Boolean) ?? []} />;
     case 'settings':
-      return <SettingsPage />;
+      return <SettingsPage openAbout={route.query.get('about') === 'master'} />;
     case 'tags':
       return <TagManagerPage />;
     default:

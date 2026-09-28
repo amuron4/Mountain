@@ -126,8 +126,13 @@ export interface Mountain extends Entity {
   memo: string;
   links: LinkRef[];
   photos: PhotoRef[];
-  /** 将来の地図API用 */
+  /** 位置（山マスターから登録した場合は山頂の緯度経度。将来の地図API用） */
   location?: GeoPoint;
+  /**
+   * 登録元の山マスター ID（山マスターから登録した場合のみ）。
+   * 任意項目なので既存データのマイグレーションは不要。重複登録の判定に使う。
+   */
+  masterId?: string;
 }
 
 // ---------------------------------------------------------------------------

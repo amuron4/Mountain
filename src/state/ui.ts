@@ -2,7 +2,7 @@
  * 画面をまたいで保持したい UI 状態（一覧の絞り込み条件・比較対象）。
  * sessionStorage に保存し、詳細画面から戻っても条件が残るようにする。
  */
-import { useCallback, useEffect, useState } from 'preact/hooks';
+import { useExternalStore } from './hooks';
 import { emptyFilter, type MountainFilter, type SortSpec } from '../domain/filter';
 import type { ID } from '../domain/types';
 
@@ -11,13 +11,25 @@ interface UiState {
   sort: SortSpec;
   compareIds: ID[];
   selectMode: boolean;
+  /** 山一覧のタブ: 自分の山 / 山名データから探す */
+  listTab: 'mine' | 'search';
+  masterQuery: string;
+  masterPrefectures: string[];
 }
 
 const KEY = 'yama-note-ui';
 export const MAX_COMPARE = 3;
 
 function load(): UiState {
-  const base: UiState = { filter: emptyFilter(), sort: { key: 'updated', dir: 'desc' }, compareIds: [], selectMode: false };
+  const base: UiState = {
+    filter: emptyFilter(),
+    sort: { key: 'updated', dir: 'desc' },
+    compareIds: [],
+    selectMode: false,
+    listTab: 'mine',
+    masterQuery: '',
+    masterPrefectures: [],
+  };
   try {
     const raw = sessionStorage.getItem(KEY);
     if (!raw) return base;
@@ -56,14 +68,14 @@ export function toggleCompare(id: ID): boolean {
   return true;
 }
 
+const subscribeUi = (fn: () => void) => {
+  listeners.add(fn);
+  return () => {
+    listeners.delete(fn);
+  };
+};
+
 export function useUi(): UiState {
-  const [, setTick] = useState(0);
-  const force = useCallback(() => setTick((x) => x + 1), []);
-  useEffect(() => {
-    listeners.add(force);
-    return () => {
-      listeners.delete(force);
-    };
-  }, []);
+  useExternalStore(subscribeUi, () => state);
   return state;
 }

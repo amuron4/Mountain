@@ -5,3 +5,4 @@ playwright-report/
 e2e/screenshots/*.tmp.png
 *.log
 .DS_Store
+data/raw/

@@ -1,0 +1,167 @@
+{
+  "format": 1,
+  "generatedAt": "2026-09-28T14:31:08.301Z",
+  "version": "92ac90104eb1",
+  "prefectures": [
+    "青森県",
+    "岩手県",
+    "宮城県",
+    "秋田県",
+    "山形県",
+    "福島県",
+    "茨城県",
+    "栃木県",
+    "群馬県",
+    "埼玉県",
+    "千葉県",
+    "東京都",
+    "神奈川県",
+    "新潟県",
+    "富山県",
+    "山梨県",
+    "長野県",
+    "岐阜県",
+    "静岡県"
+  ],
+  "total": 7826,
+  "withElevation": 0,
+  "chunks": [
+    {
+      "prefecture": "青森県",
+      "code": "02",
+      "file": "pref-02.04e1be7c33.json",
+      "count": 426
+    },
+    {
+      "prefecture": "岩手県",
+      "code": "03",
+      "file": "pref-03.93c89276e0.json",
+      "count": 856
+    },
+    {
+      "prefecture": "宮城県",
+      "code": "04",
+      "file": "pref-04.1fea1a7495.json",
+      "count": 368
+    },
+    {
+      "prefecture": "秋田県",
+      "code": "05",
+      "file": "pref-05.85d10e30ca.json",
+      "count": 580
+    },
+    {
+      "prefecture": "山形県",
+      "code": "06",
+      "file": "pref-06.b5fee26df9.json",
+      "count": 605
+    },
+    {
+      "prefecture": "福島県",
+      "code": "07",
+      "file": "pref-07.0d4f717018.json",
+      "count": 812
+    },
+    {
+      "prefecture": "茨城県",
+      "code": "08",
+      "file": "pref-08.c3335059c0.json",
+      "count": 110
+    },
+    {
+      "prefecture": "栃木県",
+      "code": "09",
+      "file": "pref-09.5ee9c74af1.json",
+      "count": 270
+    },
+    {
+      "prefecture": "群馬県",
+      "code": "10",
+      "file": "pref-10.0f6cd1bb40.json",
+      "count": 339
+    },
+    {
+      "prefecture": "埼玉県",
+      "code": "11",
+      "file": "pref-11.ab73eabdb3.json",
+      "count": 102
+    },
+    {
+      "prefecture": "千葉県",
+      "code": "12",
+      "file": "pref-12.07e3eafac6.json",
+      "count": 67
+    },
+    {
+      "prefecture": "東京都",
+      "code": "13",
+      "file": "pref-13.f62fdf50eb.json",
+      "count": 167
+    },
+    {
+      "prefecture": "神奈川県",
+      "code": "14",
+      "file": "pref-14.9f8f12d912.json",
+      "count": 124
+    },
+    {
+      "prefecture": "新潟県",
+      "code": "15",
+      "file": "pref-15.bfcad8df96.json",
+      "count": 886
+    },
+    {
+      "prefecture": "富山県",
+      "code": "16",
+      "file": "pref-16.962972ddd6.json",
+      "count": 246
+    },
+    {
+      "prefecture": "山梨県",
+      "code": "19",
+      "file": "pref-19.5a82a87806.json",
+      "count": 291
+    },
+    {
+      "prefecture": "長野県",
+      "code": "20",
+      "file": "pref-20.22181185f9.json",
+      "count": 811
+    },
+    {
+      "prefecture": "岐阜県",
+      "code": "21",
+      "file": "pref-21.1fbd1f6f4c.json",
+      "count": 425
+    },
+    {
+      "prefecture": "静岡県",
+      "code": "22",
+      "file": "pref-22.243ff722a7.json",
+      "count": 341
+    }
+  ],
+  "sources": [
+    {
+      "key": "gsi-vt",
+      "title": "山名・読み・位置: 国土地理院ベクトルタイル（注記）",
+      "credit": "国土地理院ベクトルタイル提供実験（注記データ）を加工して作成。抽出: anineco/GSI-VectorTile-MountainDB（MIT License）",
+      "url": "https://github.com/anineco/GSI-VectorTile-MountainDB",
+      "license": "国土地理院コンテンツ利用規約（CC BY 4.0 互換）／抽出データ・スクリプト: MIT License (c) 2025 Nyanta Anineco",
+      "version": "anineco/GSI-VectorTile-MountainDB@ec14a76 gsi_summits.csv"
+    },
+    {
+      "key": "n03",
+      "title": "都道府県の判定: 国土数値情報（行政区域データ）",
+      "credit": "「国土数値情報（行政区域データ）」（国土交通省）をスマートニュース メディア研究所が加工したデータ（smartnews-smri/japan-topography）を加工して作成",
+      "url": "https://github.com/smartnews-smri/japan-topography",
+      "license": "国土数値情報の利用規約に従う（出典の明記が必要）",
+      "version": "smartnews-smri/japan-topography@b403e71 N03-21（令和3年）簡素化1%",
+      "note": "県境から 400m 以内の山は隣県も所在地に含める。境界は簡略化データのため、県境付近の判定は目安。"
+    }
+  ],
+  "params": {
+    "borderToleranceM": 400,
+    "elevationMatchMaxM": 150
+  }
+}

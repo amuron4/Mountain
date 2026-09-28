@@ -21,5 +21,13 @@ test('PWA: manifest と Service Worker によりオフラインでも起動で�
   await expect(page.getByTestId('stats')).toContainText('7');
   await page.getByRole('link', { name: '今日どこ' }).click();
   await expect(page.getByTestId('suggestion').first()).toBeVisible();
+
+  // 11. 山マスター検索もオフラインで動く（プリキャッシュ済み。一度も検索画面を開いていなくても可）
+  await page.goto('/#/mountains?tab=search');
+  await page.getByLabel('山名データを検索').fill('ぶこう');
+  await expect(page.getByTestId('master-hit').filter({ hasText: '武甲山' })).toBeVisible();
+  await page.goto('/#/mountains/new');
+  await page.getByTestId('mountain-form').getByLabel('山名').fill('たにがわ');
+  await expect(page.getByTestId('master-suggest')).toContainText('谷川岳');
   await context.setOffline(false);
 });

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'preact/hooks';
+import { useEffect, useMemo, useState } from 'preact/hooks';
 import { applyFilter, countActiveConditions, emptyFilter, QUICK_NUMERIC_PRESETS, SORT_OPTIONS, sortViews, type MountainFilter, type NumRange } from '../../domain/filter';
 import { REGIONS } from '../../domain/geo';
 import { RATING_DEFS } from '../../domain/ratings';
@@ -9,6 +9,7 @@ import { navigate } from '../../state/router';
 import { getUi, MAX_COMPARE, setUi, toggleCompare, useUi } from '../../state/ui';
 import { MountainCard } from '../components/cards';
 import { Empty, Fold, PageHeader } from '../components/common';
+import { MasterSearchPanel } from '../components/master';
 import { Icon } from '../components/Icon';
 import { Sheet, toast } from '../components/overlay';
 import { TagPicker } from '../components/tags';
@@ -252,9 +253,13 @@ function SortSheet({ onClose }: { onClose: () => void }) {
   );
 }
 
-export function MountainListPage() {
+export function MountainListPage({ initialTab }: { initialTab?: 'mine' | 'search' }) {
   const store = useStore();
   const ui = useUi();
+  useEffect(() => {
+    if (initialTab && initialTab !== getUi().listTab) setUi({ listTab: initialTab });
+  }, [initialTab]);
+  const searching = ui.listTab === 'search';
   const { views, tagIndex } = store.derived;
   const [sheet, setSheet] = useState<'filter' | 'sort' | null>(null);
   const f = ui.filter;
@@ -300,14 +305,34 @@ export function MountainListPage() {
   return (
     <>
       <PageHeader title="山" sub={`${views.length}座`}>
-        <button class={`icon-btn ${ui.selectMode ? 'active' : ''}`} aria-label="比較する山を選ぶ" aria-pressed={ui.selectMode} onClick={() => setUi({ selectMode: !ui.selectMode })}>
-          <Icon name="compare" />
-        </button>
+        {!searching && (
+          <button class={`icon-btn ${ui.selectMode ? 'active' : ''}`} aria-label="比較する山を選ぶ" aria-pressed={ui.selectMode} onClick={() => setUi({ selectMode: !ui.selectMode })}>
+            <Icon name="compare" />
+          </button>
+        )}
         <a class="icon-btn" href="#/mountains/new" aria-label="山を追加">
           <Icon name="plus" />
         </a>
       </PageHeader>
       <div class="page">
+        <div class="segmented list-tabs" role="tablist" aria-label="表示する山">
+          <button type="button" role="tab" aria-selected={!searching} aria-pressed={!searching} onClick={() => setUi({ listTab: 'mine', selectMode: false })} data-testid="tab-mine">
+            自分の山
+          </button>
+          <button type="button" role="tab" aria-selected={searching} aria-pressed={searching} onClick={() => setUi({ listTab: 'search', selectMode: false })} data-testid="tab-search">
+            <Icon name="search" size={15} /> 山を探す
+          </button>
+        </div>
+
+        {searching ? (
+          <MasterSearchPanel
+            query={ui.masterQuery}
+            onQuery={(q) => setUi({ masterQuery: q })}
+            prefectures={ui.masterPrefectures}
+            onPrefectures={(p) => setUi({ masterPrefectures: p })}
+          />
+        ) : (
+        <>
         <div class="search-bar">
           <label class="search-box">
             <Icon name="search" size={19} />
@@ -410,14 +435,19 @@ export function MountainListPage() {
           <Empty>
             まだ山が登録されていません。
             <br />
-            <a class="btn primary small" style={{ marginTop: '10px' }} href="#/mountains/new">
-              山を登録する
+            <button class="btn primary small" style={{ marginTop: '10px' }} onClick={() => setUi({ listTab: 'search' })}>
+              山名データから探す
+            </button>
+            <a class="btn small" style={{ marginTop: '10px', marginLeft: '6px' }} href="#/mountains/new">
+              手入力で登録
             </a>
           </Empty>
         )}
+        </>
+        )}
       </div>
 
-      {ui.selectMode || ui.compareIds.length > 0 ? (
+      {!searching && (ui.selectMode || ui.compareIds.length > 0) ? (
         <div class="floating-bar" data-testid="compare-bar">
           <span class="fb-text">{ui.compareIds.length}座を選択中</span>
           {ui.compareIds.length > 0 && (
@@ -429,7 +459,7 @@ export function MountainListPage() {
             比較する
           </button>
         </div>
-      ) : (
+      ) : searching ? null : (
         <a class="fab" href="#/mountains/new" aria-label="山を追加">
           <Icon name="plus" size={28} />
         </a>

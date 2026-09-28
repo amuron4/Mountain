@@ -119,6 +119,7 @@ export function sanitizeMountain(v: unknown): Mountain | undefined {
     links: sanitizeLinks(v.links),
     photos: sanitizePhotos(v.photos),
     location: loc,
+    masterId: optStr(v.masterId),
     createdAt: ts(v.createdAt),
     updatedAt: ts(v.updatedAt),
     ext: ext(v.ext),
