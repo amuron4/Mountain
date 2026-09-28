@@ -1,5 +1,6 @@
 import { useMemo } from 'preact/hooks';
 import { benchmarkAgainst } from '../../domain/benchmark';
+import { elevationSourceLabel } from '../../domain/master/elevationSource';
 import { formatDuration, formatDurationShort, formatKm, formatMeters } from '../../domain/format';
 import { estimateMyTime, STATUS_LABEL, type StatSource } from '../../domain/mountain';
 import type { MountainStatus } from '../../domain/types';
@@ -79,9 +80,14 @@ export function MountainDetailPage({ id }: { id: string }) {
                 </div>
               )}
             </div>
-            <div class="elev-big num">
-              {m.elevationM !== undefined ? m.elevationM.toLocaleString() : '—'}
+            <div class="elev-big num" title={elevationSourceLabel(m.ext?.elevationSource as string | undefined)?.description}>
+              {m.elevationM !== undefined ? Math.round(m.elevationM).toLocaleString() : '—'}
               <small>m</small>
+              {m.elevationM !== undefined && elevationSourceLabel(m.ext?.elevationSource as string | undefined)?.short && (
+                <span class="mh-elev-src" data-testid="elevation-source-tag">
+                  {elevationSourceLabel(m.ext?.elevationSource as string | undefined)!.short}
+                </span>
+              )}
             </div>
           </div>
           <Segmented<MountainStatus>

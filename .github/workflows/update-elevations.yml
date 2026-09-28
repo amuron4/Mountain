@@ -1,0 +1,54 @@
+# 山名データ（山マスター）の標高を国土地理院データから補完して、結果をコミットする（手動実行）
+#
+# - 公式「日本の主な山岳標高」→ 標高タイル DEM1A → DEM5A → DEM5B → DEM5C → DEM10B の順
+# - タイルは座標から必要なものだけを直列・間隔つきで取得し、data/raw/ にキャッシュ（Actions のキャッシュで再利用）
+# - 通常のビルド・デプロイは、コミットされた scripts/master/elevations.json と public/master/ を使うだけで
+#   国土地理院には通信しない
+name: Update mountain elevations
+
+on:
+  workflow_dispatch:
+    inputs:
+      interval:
+        description: 'タイル取得の間隔（ms、200以上）'
+        default: '300'
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-elevations
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Restore GSI tile cache
+        uses: actions/cache@v4
+        with:
+          path: data/raw
+          key: gsi-raw-${{ github.run_id }}
+          restore-keys: gsi-raw-
+      - name: Fetch elevations (rate-limited)
+        run: npm run master:elevation -- --interval=${{ inputs.interval }}
+      - run: npm test
+      - name: Commit results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/master/elevations.json public/master
+          if git diff --cached --quiet; then
+            echo "変更なし"
+          else
+            git commit -m "Update mountain master elevations from GSI data"
+            git push
+          fi

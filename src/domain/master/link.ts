@@ -27,11 +27,15 @@ export function masterPoint(m: MountainMaster): GeoPoint {
 }
 
 /** 山登録フォームへ流し込む項目 */
-export function masterToMountainFields(m: MountainMaster): Pick<Mountain, 'name' | 'kana' | 'prefectures' | 'region' | 'range' | 'location' | 'masterId'> & { elevationM?: number } {
+export function masterToMountainFields(
+  m: MountainMaster,
+): Pick<Mountain, 'name' | 'kana' | 'prefectures' | 'region' | 'range' | 'location' | 'masterId'> & { elevationM?: number; ext?: Mountain['ext'] } {
   return {
     name: m.name,
     kana: m.kana,
-    elevationM: m.elevationM,
+    // 自分の山の標高は整数 m（表示と同じ）。出典は ext に残し、DEM 由来か公表値かを区別できるようにする
+    elevationM: m.elevationM !== undefined ? Math.round(m.elevationM) : undefined,
+    ext: m.elevationM !== undefined && m.elevationSource ? { elevationSource: m.elevationSource } : undefined,
     prefectures: [...m.prefectures],
     region: m.prefectures[0] ? regionOfPrefecture(m.prefectures[0]) ?? '' : '',
     range: m.range ?? '',
@@ -54,6 +58,8 @@ export function linkMountainToMaster(mountain: Mountain, m: MountainMaster): Mou
     region: mountain.region || f.region,
     range: mountain.range || f.range,
     elevationM: mountain.elevationM ?? f.elevationM,
+    // 入力済みの標高を残した場合は出典を付け替えない
+    ext: mountain.elevationM === undefined && f.ext ? { ...(mountain.ext ?? {}), ...f.ext } : mountain.ext,
   };
 }
 

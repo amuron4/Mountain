@@ -62,6 +62,8 @@ export interface MasterManifest {
   prefectures: string[];
   total: number;
   withElevation: number;
+  /** 標高の出典別件数（gsi-sangaku / gsi-dem5a など） */
+  elevationBySource?: Record<string, number>;
   chunks: MasterChunkRef[];
   sources: MasterSourceInfo[];
   /** 生成時の判定パラメータ（県境判定の許容距離など）。検証・説明用 */

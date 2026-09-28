@@ -10,6 +10,7 @@ import { Toggle } from '../components/fields';
 import { Icon } from '../components/Icon';
 import { confirmDialog, Sheet, toast } from '../components/overlay';
 import { loadMaster, useMaster } from '../../state/master';
+import { DEM_NOTE, elevationSourceLabel } from '../../domain/master/elevationSource';
 
 /** 山名データ（山マスター）の出典・ライセンス・注意事項 */
 function MasterAboutSheet({ onClose }: { onClose: () => void }) {
@@ -33,7 +34,18 @@ function MasterAboutSheet({ onClose }: { onClose: () => void }) {
             <dt>標高</dt>
             <dd>
               {man.withElevation.toLocaleString()}座で取得済み・{(man.total - man.withElevation).toLocaleString()}座は不明
-              <div class="hint">信頼できる標高データと座標・山名で確実に突合できたものだけを表示します（推測値は表示しません）。</div>
+              {man.elevationBySource && Object.keys(man.elevationBySource).length > 0 && (
+                <ul class="small" style={{ margin: '4px 0 0', paddingLeft: '18px' }} data-testid="elevation-by-source">
+                  {Object.entries(man.elevationBySource).map(([k, n]) => (
+                    <li key={k}>
+                      {elevationSourceLabel(k)?.official ? '公式の山頂標高' : elevationSourceLabel(k)?.short}: {n.toLocaleString()}座
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div class="hint">
+                公式の山頂標高（国土地理院「日本の主な山岳標高」）を優先し、それ以外は国土地理院の数値標高モデル（DEM1A→DEM5A→DEM5B→DEM5C→DEM10B）で山名位置の標高を表示します（一覧では「DEM5A」などと表示）。{DEM_NOTE}推測値は表示しません。
+              </div>
             </dd>
             <dt>データ版</dt>
             <dd>

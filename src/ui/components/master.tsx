@@ -8,6 +8,7 @@
 import { useMemo, useState } from 'preact/hooks';
 import { REGIONS } from '../../domain/geo';
 import { RegisteredLookup } from '../../domain/master/link';
+import { elevationSourceLabel, formatElevationM } from '../../domain/master/elevationSource';
 import type { MountainMaster } from '../../domain/master/types';
 import type { Mountain } from '../../domain/types';
 import { useStore } from '../../state/hooks';
@@ -25,7 +26,19 @@ export function ambiguousIds(masters: MountainMaster[]): Set<string> {
 }
 
 export function formatMasterElevation(m: MountainMaster): string {
-  return m.elevationM !== undefined ? `${Math.round(m.elevationM).toLocaleString('ja-JP')}m` : '標高不明';
+  return m.elevationM !== undefined ? formatElevationM(m.elevationM) : '標高不明';
+}
+
+/** 標高＋出典ラベル（DEM の値は公式の山頂標高と区別できるように小さく種類を表示） */
+export function MasterElevation({ master }: { master: MountainMaster }) {
+  if (master.elevationM === undefined) return <span class="mh-elev num unknown">標高不明</span>;
+  const src = elevationSourceLabel(master.elevationSource);
+  return (
+    <span class="mh-elev num" title={src?.description}>
+      {formatElevationM(master.elevationM)}
+      {src?.short && <span class="mh-elev-src">{src.short}</span>}
+    </span>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -50,7 +63,7 @@ export function MasterHitRow({ master, registered, similar, onSelect, onAdd, com
       <button type="button" class="mh-main" onClick={onSelect} aria-label={`${master.name}（${master.prefectures.join('・')}）`}>
         <span class="mh-name">
           {master.name}
-          <span class={`mh-elev num ${master.elevationM === undefined ? 'unknown' : ''}`}>{formatMasterElevation(master)}</span>
+          <MasterElevation master={master} />
           {!registered && similar && <span class="mh-badge similar">同名の登録あり</span>}
         </span>
         <span class="mh-sub">

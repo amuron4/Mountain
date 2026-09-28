@@ -172,3 +172,44 @@ describe('generated master data (public/master)', () => {
     expect(index.search('大雪山').hits.every((h) => !h.master.prefectures.includes('北海道'))).toBe(true);
   });
 });
+
+describe('elevation with source (DEM vs official)', () => {
+  it('decodes rows with elevation and source, and keeps undefined when missing', async () => {
+    const { rowsToMasters } = await import('../../data/masterRepository');
+    const chunk = {
+      format: 1 as const,
+      prefecture: '埼玉県',
+      fields: ['id', 'name', 'kana', 'lat', 'lon', 'prefectures', 'elevationM', 'aliases', 'range', 'elevationSource'] as MasterChunkFile['fields'],
+      source: 'gsi-vt',
+      rows: [
+        ['a', '武甲山', 'ぶこうざん', 35.95162, 139.097785, ['11'], 1303.9, null, null, 'gsi-dem5a'],
+        ['b', '両神山', 'りょうかみさん', 36.0234, 138.8412, ['11'], 1723, null, null, 'gsi-sangaku'],
+        ['c', '丸山', 'まるやま', 36.0, 139.0, ['11'], null],
+      ] as MasterChunkFile['rows'],
+    };
+    const [a, b, c] = rowsToMasters(chunk);
+    expect(a).toMatchObject({ elevationM: 1303.9, elevationSource: 'gsi-dem5a', prefectures: ['埼玉県'] });
+    expect(b).toMatchObject({ elevationM: 1723, elevationSource: 'gsi-sangaku' });
+    expect(c.elevationM).toBeUndefined();
+    expect(c.elevationSource).toBeUndefined();
+  });
+
+  it('copies elevation as integer m with its source into the user Mountain', async () => {
+    const { elevationSourceLabel, formatElevationM } = await import('./elevationSource');
+    const dem = { ...FIXTURE[0], elevationM: 1303.9, elevationSource: 'gsi-dem5a' };
+    const f = masterToMountainFields(dem);
+    expect(f.elevationM).toBe(1304);
+    expect(f.ext).toEqual({ elevationSource: 'gsi-dem5a' });
+    expect(formatElevationM(1303.9)).toBe('1,304m');
+    expect(elevationSourceLabel('gsi-dem5a')).toMatchObject({ short: 'DEM5A', official: false });
+    expect(elevationSourceLabel('gsi-sangaku')).toMatchObject({ official: true });
+    expect(elevationSourceLabel('gsi-sangaku')!.short).toBeUndefined();
+    // 標高不明の山には出典も付けない
+    expect(masterToMountainFields(FIXTURE[2]).ext).toBeUndefined();
+    // 手入力済みの標高は紐づけで上書きしない（出典も付けない）
+    const { linkMountainToMaster } = await import('./link');
+    const linked = linkMountainToMaster(createMountain({ name: '武甲山', elevationM: 1304 }), dem);
+    expect(linked.elevationM).toBe(1304);
+    expect(linked.ext?.elevationSource).toBeUndefined();
+  });
+});

@@ -13,7 +13,8 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "icons": "node scripts/gen-icons.mjs",
-    "master:build": "tsx scripts/master/build.ts"
+    "master:build": "tsx scripts/master/build.ts",
+    "master:elevation": "tsx scripts/master/elevation.ts"
   },
   "dependencies": {
     "idb": "^8.0.3",
@@ -23,7 +24,9 @@
     "@playwright/test": "^1.63.0",
     "@preact/preset-vite": "^2.10.6",
     "@types/node": "^22.20.4",
+    "@types/pngjs": "^6.0.5",
     "fake-indexeddb": "^6.2.5",
+    "pngjs": "^7.0.0",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "vite": "^8.3.1",

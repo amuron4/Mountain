@@ -9,11 +9,11 @@
  *   ↓ 緯度経度 → 都道府県判定（行政区域ポリゴン、県境は複数都県）
  *   ↓ 対象都道府県（scripts/master/targets.json）だけ抽出
  *   ↓ 正規化・重複除去・決定的 ID 付与
- *   ↓ （任意）標高データと座標優先で突合
+ *   ↓ 取得済み標高（scripts/master/elevations.json）を付与
  *   ↓ public/master/ に都道府県別チャンク＋manifest.json を出力
  *
- * 標高データ（国土地理院「日本の主な山岳標高」の CSV / GeoJSON）は利用規約上ダウンロードして使えるが、
- * 自動取得はせず data/raw/elevation/ に置かれた場合だけ使う（README 参照）。置かれていなければ標高は付けない。
+ * 標高は scripts/master/elevations.json（npm run master:elevation が国土地理院データから作成・コミット）を
+ * 読んで付けるだけで、このスクリプト自体は国土地理院へアクセスしない。
  */
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -22,11 +22,12 @@ import { fileURLToPath } from 'node:url';
 import { PREFECTURES_JIS, prefectureCode } from '../../src/domain/geo';
 import type { MasterChunkFile, MasterManifest, MasterRow, MasterSourceInfo } from '../../src/domain/master/types';
 import { decodeText, parseCsvObjects } from './lib/csv';
-import { matchElevations, parseElevationFile, type ElevationPoint } from './lib/elevation';
+import { countBySource, ELEVATION_SOURCE_INFO, ELEVATION_SOURCE_ORDER, readElevationStore, type ElevationStoreFile } from './lib/elevationStore';
 import { PrefectureLocator, type GeoJsonFeature } from './lib/prefecture';
 import { dedupeSummits, masterId, toSummit } from './lib/summits';
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+export const ELEVATIONS_PATH = join(ROOT, 'scripts/master/elevations.json');
 const RAW_DIR = join(ROOT, 'data/raw');
 const OUT_DIR = join(ROOT, 'public/master');
 
@@ -96,23 +97,8 @@ function loadTargets(): string[] {
   return cfg.prefectures;
 }
 
-function loadElevationPoints(): { points: ElevationPoint[]; files: string[]; hashes: string[] } {
-  const dir = join(RAW_DIR, 'elevation');
-  if (!existsSync(dir)) return { points: [], files: [], hashes: [] };
-  const files = readdirSync(dir).filter((f) => /\.(csv|geojson|json)$/i.test(f));
-  const points: ElevationPoint[] = [];
-  const hashes: string[] = [];
-  for (const f of files) {
-    const buf = new Uint8Array(readFileSync(join(dir, f)));
-    const { points: ps, skipped } = parseElevationFile(buf, f);
-    console.log(`  elevation source ${f}: ${ps.length} points (skipped ${skipped})`);
-    points.push(...ps);
-    hashes.push(sha256(buf).slice(0, 12));
-  }
-  return { points, files, hashes };
-}
-
-async function main() {
+/** 山マスターを生成して public/master/ に書き出す */
+export async function buildMaster() {
   const targets = loadTargets();
   const targetSet = new Set(targets);
   console.log(`対象: ${targets.length}都道府県`);
@@ -171,36 +157,37 @@ async function main() {
   }
   if (Object.keys(overrides.prefectures).length) console.log(`都道府県の補正: ${Object.keys(overrides.prefectures).length}件`);
 
-  // 5. 標高（任意）
-  const elev = loadElevationPoints();
-  const elevationKey = elev.files.length ? `gsi-sangaku` : undefined;
-  let elevations = new Map<string, number>();
-  if (elev.points.length) {
-    const m = matchElevations(elev.points, records.map((r) => ({ id: r.id, name: r.name, kana: r.kana, aliases: r.aliases, lat: r.lat, lon: r.lon })), {
-      maxDistanceM: ELEVATION_MATCH_MAX_M,
-    });
-    elevations = m.elevations;
-    console.log(`標高突合: 採用 ${m.matched} / 近傍候補なし ${m.noCandidate} / 名称不一致で不採用 ${m.nameMismatch} / 曖昧で不採用 ${m.ambiguous}`);
-    SOURCES.push({
-      key: 'gsi-sangaku',
-      title: '標高: 国土地理院「日本の主な山岳標高」',
-      credit: '国土地理院「日本の主な山岳標高」を加工して作成',
-      url: 'https://www.gsi.go.jp/kihonjohochousa/kihonjohochousa41139.html',
-      license: '国土地理院コンテンツ利用規約（CC BY 4.0 互換）',
-      version: `${elev.files.join(', ')} (sha256 ${elev.hashes.join(', ')})`,
-      note: `山頂位置から ${ELEVATION_MATCH_MAX_M}m 以内かつ山名・読みが一致した場合のみ採用。一意に決まらないものは標高なし。`,
-    });
-  } else {
-    console.log('標高データ: data/raw/elevation/ に無いため標高は付与しません（elevationM は undefined）');
+  // 5. 標高（npm run master:elevation が作成した取得済みデータを付与。ここでは通信しない）
+  const store = readElevationStore(ELEVATIONS_PATH);
+  const elevations = new Map<string, ElevationStoreFile['items'][string]>();
+  for (const r of records) {
+    const v = store.items[r.id];
+    if (v) elevations.set(r.id, v);
   }
+  const stale = Object.keys(store.items).filter((id) => !ids.has(id)).length;
+  const bySource = countBySource(Object.fromEntries(elevations));
+  for (const key of ELEVATION_SOURCE_ORDER) {
+    if (!bySource[key]) continue;
+    const info = ELEVATION_SOURCE_INFO[key];
+    SOURCES.push({
+      key,
+      title: info.title,
+      credit: info.credit,
+      url: key === 'gsi-sangaku' ? 'https://www.gsi.go.jp/kihonjohochousa/kihonjohochousa41139.html' : 'https://maps.gsi.go.jp/development/ichiran.html',
+      license: '国土地理院コンテンツ利用規約（CC BY 4.0 互換）',
+      version: key === 'gsi-sangaku' && store.official ? `${store.official.file}（sha256 ${store.official.sha256.slice(0, 12)}）` : `取得日 ${store.updatedAt.slice(0, 10)}`,
+      note: `${info.note}（${bySource[key].toLocaleString()}座）`,
+    });
+  }
+  console.log(`標高: ${elevations.size}座に付与（elevations.json ${Object.keys(store.items).length}件、現在のデータに無い ID ${stale}件は無視）`);
 
   // 6. 出力（主な所在地の都道府県ごと。主が対象外の県境の山は、対象県のうち最初の県へ）
   const byPref = new Map<string, MasterRow[]>();
   for (const r of records.sort((a, b) => a.kana.localeCompare(b.kana, 'ja') || a.lat - b.lat)) {
     const chunkPref = targetSet.has(r.prefectures[0]) ? r.prefectures[0] : r.prefectures.find((p) => targetSet.has(p))!;
     const e = elevations.get(r.id);
-    const row: MasterRow = [r.id, r.name, r.kana, r.lat, r.lon, r.prefectures.map((p) => prefectureCode(p)!), e ?? null];
-    const extra: [string[] | null, string | null, string | null] = [r.aliases.length ? r.aliases : null, null, e !== undefined ? elevationKey! : null];
+    const row: MasterRow = [r.id, r.name, r.kana, r.lat, r.lon, r.prefectures.map((p) => prefectureCode(p)!), e ? e[0] : null];
+    const extra: [string[] | null, string | null, string | null] = [r.aliases.length ? r.aliases : null, null, e ? e[1] : null];
     // 末尾の null は省略してサイズを抑える
     while (extra.length && extra[extra.length - 1] === null) extra.pop();
     (row as unknown[]).push(...extra);
@@ -238,6 +225,7 @@ async function main() {
     prefectures: targets,
     total,
     withElevation: elevations.size,
+    elevationBySource: Object.fromEntries(ELEVATION_SOURCE_ORDER.filter((k) => bySource[k]).map((k) => [k, bySource[k]])),
     chunks,
     sources: SOURCES,
     params: { borderToleranceM: BORDER_TOLERANCE_M, elevationMatchMaxM: ELEVATION_MATCH_MAX_M },
@@ -267,7 +255,10 @@ async function main() {
   console.log(`県境（複数都県）の山: ${multi}`);
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+// npm run master:build として直接実行されたときだけ動かす（master:elevation からも呼び出すため）
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  buildMaster().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
+}

@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "generatedAt": "2026-09-28T14:31:08.301Z",
+  "generatedAt": "2026-09-28T21:24:33.690Z",
   "version": "92ac90104eb1",
   "prefectures": [
     "青森県",
@@ -25,6 +25,7 @@
   ],
   "total": 7826,
   "withElevation": 0,
+  "elevationBySource": {},
   "chunks": [
     {
       "prefecture": "青森県",

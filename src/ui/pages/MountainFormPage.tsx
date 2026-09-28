@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { RANGE_SUGGESTIONS, REGIONS, regionOfPrefecture } from '../../domain/geo';
 import { masterToMountainFields, RegisteredLookup } from '../../domain/master/link';
+import { DEM_NOTE, elevationSourceLabel } from '../../domain/master/elevationSource';
 import type { MountainMaster } from '../../domain/master/types';
 import { createCourse, createMountain, STATUS_LABEL } from '../../domain/mountain';
 import type { Course, Mountain, MountainStatus } from '../../domain/types';
@@ -187,6 +188,13 @@ export function MountainFormPage({ id, masterId }: { id?: string; masterId?: str
                   </div>
                 )}
                 {picked && picked.elevationM === undefined && <div class="small">標高は出典データに無いため空欄です。分かれば入力してください。</div>}
+                {picked && picked.elevationM !== undefined && (
+                  <div class="small" data-testid="elevation-source">
+                    {elevationSourceLabel(picked.elevationSource)?.official
+                      ? '標高: 国土地理院「日本の主な山岳標高」の公表値'
+                      : `標高: 国土地理院の数値標高モデル（${elevationSourceLabel(picked.elevationSource)?.short ?? 'DEM'}）の値。${DEM_NOTE}`}
+                  </div>
+                )}
                 {picked && !existing && lookup.findSimilarUnlocated(picked) && (
                   <div class="small" data-testid="similar-warning">
                     ⚠️ 同じ名前の「{lookup.findSimilarUnlocated(picked)!.name}」が登録済みです（位置情報なし）。同じ山なら
@@ -209,7 +217,16 @@ export function MountainFormPage({ id, masterId }: { id?: string; masterId?: str
           )}
           <div class="grid-2">
             <TextField label="読み" name="kana" value={m.kana} onInput={(v) => set({ kana: v })} placeholder="例: ひるがたけ" />
-            <NumberField label="標高" unit="m" name="elevation" value={m.elevationM} onChange={(v) => set({ elevationM: v })} placeholder="例: 1673" />
+            <NumberField
+              label="標高"
+              unit="m"
+              name="elevation"
+              value={m.elevationM}
+              onChange={(v) => {
+                // 手で変更した標高には山名データの出典を付けない
+                const { elevationSource: _drop, ...restExt } = m.ext ?? {};
+                set({ elevationM: v, ext: Object.keys(restExt).length ? restExt : undefined });
+              }} placeholder="例: 1673" />
           </div>
           <PrefecturePicker
             value={m.prefectures}
