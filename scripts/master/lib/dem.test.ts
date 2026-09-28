@@ -78,8 +78,8 @@ describe('resolveDemElevations (priority DEM1A → DEM5A → DEM5B → DEM5C →
   };
   const px = (p: { lat: number; lon: number }, z: number) => tilePixel(p.lat, p.lon, z);
   const tiles = new Map<string, Uint8Array>([
-    // DEM1A: 存在確認タイル(z15)と本取得タイル(z17)
-    [key('dem1a_png', 15, P.dem1a), tilePng(1300)],
+    // DEM1A: 存在確認タイル(z12)と本取得タイル(z17)
+    [key('dem1a_png', 12, P.dem1a), tilePng(1300)],
     [key('dem1a_png', 17, P.dem1a), tilePng(1300, [{ ...px(P.dem1a, 17), h: 1303.62 }])],
     // DEM5A: dem5a と dem5aTwin は同じタイル
     [key('dem5a_png', 15, P.dem5a), tilePng(1970.44)],
@@ -127,6 +127,7 @@ describe('resolveDemElevations (priority DEM1A → DEM5A → DEM5B → DEM5C →
 
   it('has sources in the required order', () => {
     expect(DEM_SOURCES.map((s) => `${s.label}@${s.zoom}`)).toEqual(['DEM1A@17', 'DEM5A@15', 'DEM5B@15', 'DEM5C@15', 'DEM10B@14']);
+    expect(DEM_SOURCES[0].probeZoom).toBe(12);
   });
 });
 

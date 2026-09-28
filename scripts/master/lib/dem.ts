@@ -4,8 +4,8 @@
  * - タイルの種類とズームは地理院地図（gsi-cyberjapan/gsimaps）の地点標高表示と同じ:
  *   DEM1A=z17, DEM5A/DEM5B/DEM5C=z15, DEM10B=z14。精度の高い順に試し、値が取れた最初のものを採用する。
  * - 7,826座に個別 API を叩くのではなく、座標から必要なタイルを計算し、同じタイルの山はまとめて1回だけ取得する。
- * - DEM1A は整備範囲が限られるため、まず z15 の DEM1A タイルで有無を確認し、無い地域では z17 を要求しない
- *   （国土地理院サーバーへの不要なアクセスを減らすため）。
+ * - DEM1A は整備範囲が限られるため、まず z12（約10km四方）の DEM1A タイルの有無を確認し、
+ *   タイルが無い地域の山には z17 を要求しない（国土地理院サーバーへの不要なアクセスを減らすため）。
  * - PNG の RGB → 標高の変換式は地理院地図のソースと同じ（無効値は RGB=(128,0,0)）。
  * - 値は「山名注記の位置の地形の標高」であり、公表されている山頂標高と一致するとは限らない（出典キーで区別する）。
  */
@@ -27,7 +27,7 @@ export interface DemSource {
 
 /** 精度の高い順（DEM1A → DEM5A → DEM5B → DEM5C → DEM10B） */
 export const DEM_SOURCES: DemSource[] = [
-  { key: 'gsi-dem1a', label: 'DEM1A', tileset: 'dem1a_png', zoom: 17, probeZoom: 15, resolutionM: 1 },
+  { key: 'gsi-dem1a', label: 'DEM1A', tileset: 'dem1a_png', zoom: 17, probeZoom: 12, resolutionM: 1 },
   { key: 'gsi-dem5a', label: 'DEM5A', tileset: 'dem5a_png', zoom: 15, resolutionM: 5 },
   { key: 'gsi-dem5b', label: 'DEM5B', tileset: 'dem5b_png', zoom: 15, resolutionM: 5 },
   { key: 'gsi-dem5c', label: 'DEM5C', tileset: 'dem5c_png', zoom: 15, resolutionM: 5 },
@@ -155,17 +155,14 @@ export async function resolveDemElevations(
 
   let remaining = points;
   for (const src of sources) {
-    // 1) 存在確認（DEM1A）: z15 タイルで値がある点だけを z17 で取得する
+    // 1) 存在確認（DEM1A）: 低ズームのタイルがある地域の点だけを高ズームで取得する
+    //    （画素は縮小されているので値の有無では判定せず、タイルの有無だけで絞る）
     let candidates = remaining;
     if (src.probeZoom !== undefined) {
       const kept: DemPoint[] = [];
       for (const group of groupByTile(remaining, src.probeZoom)) {
         const tile = await load(src.tileset, src.probeZoom, group.tile.x, group.tile.y);
-        if (!tile) continue;
-        for (const p of group.points) {
-          const t = tilePixel(p.lat, p.lon, src.probeZoom);
-          if (elevationAt(tile, t.px, t.py) !== undefined) kept.push(p);
-        }
+        if (tile) kept.push(...group.points);
       }
       candidates = kept;
     }
