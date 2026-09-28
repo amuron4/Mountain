@@ -32,6 +32,8 @@ export interface Suggestion {
   /** 注意点・データ不足など */
   warnings: string[];
   matchedMoodIds: string[];
+  /** 部分的にしか合わなかった気分（例: 滝は無いが渓流はある） */
+  partialMoodIds: string[];
   /** 選んだ気分のうち一致しなかったもの */
   missedMoodIds: string[];
 }
@@ -45,6 +47,8 @@ export interface Suggester {
 /** 気分ルールの評価結果。unknown はデータ不足で判定できない */
 export interface MoodEvaluation {
   match: boolean | 'unknown';
+  /** 近い要素はあるが完全には合わない */
+  partial?: boolean;
   score: number;
   reasons: string[];
 }

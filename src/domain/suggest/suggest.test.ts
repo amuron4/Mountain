@@ -70,3 +70,15 @@ describe('rule-based suggestions', () => {
     expect(r.every((s) => s.reasons.join().includes('温泉'))).toBe(true);
   });
 });
+
+describe('partial matches', () => {
+  const { views, tagIndex } = sampleContext();
+  it('stream-only mountains rank below real waterfalls and are marked partial', () => {
+    const r = suggestByRules({ ...base, moodIds: ['waterfall'] }, { views, tagIndex });
+    const full = r.filter((s) => s.matchedMoodIds.includes('waterfall'));
+    const part = r.filter((s) => s.partialMoodIds.includes('waterfall'));
+    expect(full.length).toBe(3);
+    expect(part.length).toBeGreaterThan(0);
+    expect(r.indexOf(part[0])).toBeGreaterThan(r.indexOf(full[full.length - 1]));
+  });
+});

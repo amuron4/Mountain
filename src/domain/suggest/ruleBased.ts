@@ -32,6 +32,7 @@ export function suggestByRules(req: SuggestionRequest, ctx: SuggestionContext): 
     const reasons: string[] = [];
     const warnings: string[] = [];
     const matched: string[] = [];
+    const partial: string[] = [];
     const missed: string[] = [];
     let score = 0;
     let excluded = false;
@@ -59,7 +60,7 @@ export function suggestByRules(req: SuggestionRequest, ctx: SuggestionContext): 
       const ev = mood.evaluate(v, ctx, req);
       if (ev.match === true) {
         softMatched++;
-        matched.push(mood.id);
+        (ev.partial ? partial : matched).push(mood.id);
         score += ev.score;
         reasons.push(`${mood.emoji} ${mood.label}: ${ev.reasons.join('、')}`);
       } else {
@@ -99,12 +100,13 @@ export function suggestByRules(req: SuggestionRequest, ctx: SuggestionContext): 
       if (!reasons.length) reasons.push('未踏の候補');
     }
 
-    results.push({ view: v, score, reasons, warnings, matchedMoodIds: matched, missedMoodIds: missed });
+    results.push({ view: v, score, reasons, warnings, matchedMoodIds: matched, partialMoodIds: partial, missedMoodIds: missed });
   }
 
   results.sort(
     (a, b) =>
       b.matchedMoodIds.length - a.matchedMoodIds.length ||
+      b.partialMoodIds.length - a.partialMoodIds.length ||
       b.score - a.score ||
       a.view.mountain.name.localeCompare(b.view.mountain.name, 'ja'),
   );

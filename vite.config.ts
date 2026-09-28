@@ -4,6 +4,8 @@ import preact from '@preact/preset-vite';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 
+const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string };
+
 /**
  * ビルド成果物の一覧を埋め込んだ Service Worker (sw.js) を生成する小さなプラグイン。
  * 外部ライブラリ(workbox 等)に頼らず、オフライン用のプリキャッシュを実現する。
@@ -28,6 +30,9 @@ function serviceWorkerPlugin(): Plugin {
 
 export default defineConfig({
   base: './',
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+  },
   plugins: [preact(), serviceWorkerPlugin()],
   build: {
     target: 'es2020',

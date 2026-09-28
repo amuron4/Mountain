@@ -111,7 +111,7 @@ export const MOOD_RULES: MoodRule[] = [
       const weak = tagHits(v, ctx, [T.brook, T.stream, T.gorge]);
       const score = strong.length * 3 + weak.length;
       if (strong.length) return { match: true, score, reasons: tagReason([...strong, ...weak]) };
-      if (weak.length) return { match: true, score, reasons: [...tagReason(weak), '（滝の登録はなし）'] };
+      if (weak.length) return { match: true, partial: true, score, reasons: [...tagReason(weak), '（滝の登録はなし）'] };
       return no();
     },
   },
