@@ -15,6 +15,13 @@
   URL: https://github.com/smartnews-smri/japan-topography
   注記: 県境から 400m 以内の山は隣県も所在地に含める。境界は簡略化データのため、県境付近の判定は目安。
 
+■ 標高: 国土地理院「日本の主な山岳標高」
+  出典: 国土地理院「日本の主な山岳標高」を加工して作成
+  ライセンス: 国土地理院コンテンツ利用規約（CC BY 4.0 互換）
+  版: data/official/1003zan20260331.geojson（sha256 5b6c0270cf78）
+  URL: https://www.gsi.go.jp/kihonjohochousa/kihonjohochousa41139.html
+  注記: 公表されている山頂の標高。公式の地点から150m以内（同名の山が近くに無ければ600m以内）で山名・読みが一致した場合のみ採用。（562座）
+
 ■ anineco/GSI-VectorTile-MountainDB の LICENSE
 
 MIT License

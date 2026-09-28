@@ -37,8 +37,14 @@ const OUT_DIR = join(ROOT, 'public/master');
 
 /** 他県の境界までこの距離以内なら、その県も所在地に含める（簡略化ポリゴンの誤差も吸収） */
 export const BORDER_TOLERANCE_M = 400;
-/** 標高データと山マスターを突合する最大距離 */
+/** 標高データと山マスターを突合する距離（この距離以内で山名・読みが一致すれば採用） */
 export const ELEVATION_MATCH_MAX_M = 150;
+/**
+ * 山名注記が山頂から離れて置かれている場合の許容距離。
+ * 150m を超えてこの距離以内なら、同じ名前の山マスターが ELEVATION_MATCH_UNIQUE_M 以内に他に無い場合だけ採用する。
+ */
+export const ELEVATION_MATCH_FAR_M = 600;
+export const ELEVATION_MATCH_UNIQUE_M = 3000;
 
 const SUMMITS = {
   repo: 'anineco/GSI-VectorTile-MountainDB',
@@ -228,7 +234,12 @@ export async function buildMaster() {
     elevationBySource: Object.fromEntries(ELEVATION_SOURCE_ORDER.filter((k) => bySource[k]).map((k) => [k, bySource[k]])),
     chunks,
     sources: SOURCES,
-    params: { borderToleranceM: BORDER_TOLERANCE_M, elevationMatchMaxM: ELEVATION_MATCH_MAX_M },
+    params: {
+      borderToleranceM: BORDER_TOLERANCE_M,
+      elevationMatchMaxM: ELEVATION_MATCH_MAX_M,
+      elevationMatchFarM: ELEVATION_MATCH_FAR_M,
+      elevationMatchUniqueM: ELEVATION_MATCH_UNIQUE_M,
+    },
   };
   writeFileSync(join(OUT_DIR, 'manifest.json'), JSON.stringify(manifest, null, 2));
 

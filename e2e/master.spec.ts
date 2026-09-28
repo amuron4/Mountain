@@ -18,25 +18,30 @@ const hit = (page: Page, name: string) => page.getByTestId('master-hit').filter(
 test('4・5・9. 山名オートコンプリート → フォーム自動入力 → 保存 → 通常の山として編集・再読み込み後も維持', async ({ page }) => {
   await openApp(page, '#/mountains/new');
   const form = page.getByTestId('mountain-form');
-  await form.getByLabel('山名').fill('ぶこ');
   const suggest = page.getByTestId('master-suggest');
+  // 公式の山岳標高に無い山は「標高不明」（推測しない）
+  await form.getByRole('textbox', { name: '山名' }).fill('こもちやま');
+  await expect(suggest.getByTestId('master-hit').filter({ hasText: '小持山' }).filter({ hasText: '埼玉県' })).toContainText('標高不明');
+
+  await form.getByRole('textbox', { name: '山名' }).fill('ぶこ');
   await expect(suggest).toBeVisible();
   const buko = suggest.getByTestId('master-hit').filter({ hasText: '武甲山' });
   await expect(buko).toContainText('ぶこうざん');
   await expect(buko).toContainText('埼玉県');
-  await expect(buko).toContainText('標高不明');
+  await expect(buko).toContainText('1,304m'); // 国土地理院「日本の主な山岳標高」の公表値
+  await expect(buko).not.toContainText('DEM');
   await buko.locator('.mh-main').click();
 
   await expect(suggest).toBeHidden();
   await expect(form.getByLabel('山名')).toHaveValue('武甲山');
   await expect(form.getByLabel('読み')).toHaveValue('ぶこうざん');
-  await expect(form.locator('input[name=elevation]')).toHaveValue(''); // 標高不明は空欄（推測しない）
+  await expect(form.locator('input[name=elevation]')).toHaveValue('1304');
+  await expect(page.getByTestId('elevation-source')).toContainText('日本の主な山岳標高');
   await expect(form.getByRole('button', { name: '埼玉県を外す' })).toBeVisible();
   await expect(form.locator('#region')).toHaveValue('関東');
   await expect(page.getByTestId('master-linked')).toContainText('35.95162, 139.09778');
 
   // ユーザーが追加情報を入力して保存
-  await form.locator('input[name=elevation]').fill('1304');
   await form.getByRole('group', { name: '行きたい度' }).getByRole('button', { name: '★★★' }).click();
   await page.getByTestId('save-mountain').click();
 
@@ -202,5 +207,6 @@ test('出典表示: 設定の「山名データについて」', async ({ page }
   await expect(sheet).toContainText('国土地理院');
   await expect(sheet).toContainText('国土数値情報');
   await expect(sheet).toContainText('MIT');
-  await expect(sheet.getByTestId('master-source')).toHaveCount(2);
+  await expect(sheet).toContainText('日本の主な山岳標高');
+  await expect(sheet.getByTestId('master-source')).toHaveCount(3);
 });

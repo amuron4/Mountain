@@ -24,7 +24,7 @@ export const ELEVATION_SOURCE_INFO: Record<ElevationSourceKey, { title: string; 
   'gsi-sangaku': {
     title: '標高: 国土地理院「日本の主な山岳標高」',
     credit: '国土地理院「日本の主な山岳標高」を加工して作成',
-    note: '公表されている山頂の標高。山名位置から150m以内かつ山名・読みが一致した場合のみ採用。',
+    note: '公表されている山頂の標高。公式の地点から150m以内（同名の山が近くに無ければ600m以内）で山名・読みが一致した場合のみ採用。',
   },
   'gsi-dem1a': {
     title: '標高: 国土地理院 標高タイル（DEM1A）',

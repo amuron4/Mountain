@@ -6,8 +6,8 @@
  *   npm run master:elevation -- --no-official --interval=500
  *
  * 1. 国土地理院「日本の主な山岳標高」（公式の山頂標高）
- *    - data/raw/elevation/ に CSV / GeoJSON があればそれを使い、無ければ公式ページから CSV を1回だけ取得してキャッシュ
- *    - 山名位置から 150m 以内かつ山名・読みが一致したものだけ採用（名前だけでは突合しない。曖昧なら不採用）
+ *    - data/official/（コミット用）か data/raw/elevation/ に CSV / GeoJSON があればそれを使い、無ければ公式ページから CSV を1回だけ取得してキャッシュ
+ *    - 公式の地点から 150m 以内（同名の山が 3km 以内に他に無ければ 600m 以内）の山名注記で、山名・山頂名・読みが一致したものだけ採用（名前だけでは突合しない。曖昧なら不採用）
  * 2. 公式に一致しない山は、山名位置の緯度経度から標高タイル（PNG）の画素値を読む
  *    - 精度の高い順に DEM1A(z17) → DEM5A → DEM5B → DEM5C(z15) → DEM10B(z14)
  *    - 必要なタイルを座標から計算し、同じタイルの山はまとめて1回だけ取得（data/raw/dem/ にキャッシュ）
@@ -21,7 +21,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { rowsToMasters } from '../../src/data/masterRepository';
 import type { MasterChunkFile, MasterManifest, MountainMaster } from '../../src/domain/master/types';
-import { buildMaster, ELEVATIONS_PATH, ELEVATION_MATCH_MAX_M, ROOT } from './build';
+import { buildMaster, ELEVATIONS_PATH, ELEVATION_MATCH_FAR_M, ELEVATION_MATCH_MAX_M, ELEVATION_MATCH_UNIQUE_M, ROOT } from './build';
 import { DEM_SOURCES, resolveDemElevations, roundElevation } from './lib/dem';
 import { matchElevations, parseElevationFile, type ElevationPoint } from './lib/elevation';
 import { countBySource, ELEVATION_SOURCE_ORDER, readElevationStore, writeElevationStore, type ElevationStoreFile } from './lib/elevationStore';
@@ -168,11 +168,15 @@ async function main() {
       const m = matchElevations(
         o.points,
         masters.map((x) => ({ id: x.id, name: x.name, kana: x.kana, aliases: x.aliases ?? [], lat: x.latitude, lon: x.longitude })),
-        { maxDistanceM: ELEVATION_MATCH_MAX_M },
+        { maxDistanceM: ELEVATION_MATCH_MAX_M, farDistanceM: ELEVATION_MATCH_FAR_M, uniqueRadiusM: ELEVATION_MATCH_UNIQUE_M },
       );
       for (const [id, e] of m.elevations) items[id] = [roundElevation(e), 'gsi-sangaku'];
       official = { file: o.file!, sha256: o.sha!, points: o.points.length };
-      console.log(`  公式山岳標高と突合: 採用 ${m.matched} / 近傍に山名なし ${m.noCandidate} / 名称不一致で不採用 ${m.nameMismatch} / 曖昧で不採用 ${m.ambiguous}`);
+      console.log(
+        `  公式山岳標高と突合: 採用 ${m.matched}座（うち注記が ${ELEVATION_MATCH_MAX_M}m 超〜${ELEVATION_MATCH_FAR_M}m 離れていたもの ${m.far.length}）` +
+          ` / 地点ベース: 近くに山マスターなし ${m.noCandidate}・名称不一致で不採用 ${m.nameMismatch}・曖昧で不採用 ${m.ambiguous}`,
+      );
+      for (const f of m.far) console.log(`    （離れた注記）${f.name} ${f.elevationM}m ← 距離 ${f.distanceM}m`);
     }
   }
 

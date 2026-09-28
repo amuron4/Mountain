@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseCsv, parseCsvObjects } from './csv';
-import { matchElevations, parseCoordinate, parseElevation, parseElevationFile, splitNames, type ElevationPoint, type MatchTarget } from './elevation';
+import { matchElevations, matchKey, parseCoordinate, parseElevation, parseElevationFile, parseMountainLabel, splitNames, type ElevationPoint, type MatchTarget } from './elevation';
 import { PrefectureLocator, pointInRing } from './prefecture';
 import { dedupeSummits, masterId, toSummit } from './summits';
 
@@ -180,5 +180,61 @@ describe('日本の主な山岳標高の形式（山名＜山頂名＞）', () =
     const r = parseElevationFile(new TextEncoder().encode(csv), 'x.csv');
     expect(r.hasCoordinates).toBe(false);
     expect(r.points).toHaveLength(0);
+  });
+});
+
+describe('日本の主な山岳標高（1003山）の実データで見つかった形式', () => {
+  const t = (id: string, name: string, kana: string, lat: number, lon: number): MatchTarget => ({ id, name, kana, aliases: [], lat, lon });
+  const pt = (p: Partial<ElevationPoint>): ElevationPoint => ({ name: '', altNames: [], lat: 0, lon: 0, elevationM: 1000, ...p });
+  const opts = { maxDistanceM: 150, farDistanceM: 600, uniqueRadiusM: 3000 };
+
+  it('parses nested parentheses and island names in brackets', () => {
+    expect(parseMountainLabel('蔵王山＜不忘山（御前岳）＞')).toEqual({ name: '蔵王山', nameAlts: [], summit: '不忘山', summitAlts: ['御前岳'] });
+    expect(parseMountainLabel('大雪山（ヌタプカウシペ）＜旭岳＞')).toEqual({ name: '大雪山', nameAlts: ['ヌタプカウシペ'], summit: '旭岳', summitAlts: [] });
+    expect(splitNames('鶏冠山（黒川山）')).toEqual({ name: '鶏冠山', alts: ['黒川山'] });
+    expect(parseMountainLabel('[南硫黄島]').name).toBe('南硫黄島');
+  });
+
+  it('folds kanji variants only for matching', () => {
+    expect(matchKey('金峯山')).toBe(matchKey('金峰山'));
+    expect(matchKey('八ケ岳')).toBe(matchKey('八ヶ岳'));
+    expect(matchKey('剣が峰')).toBe(matchKey('剣ヶ峰'));
+    expect(matchKey('御嶽山')).toBe(matchKey('御岳山'));
+    expect(matchKey('大山')).not.toBe(matchKey('丸山'));
+  });
+
+  it('gives the summit elevation to both the summit label and the mountain label (那須岳＜茶臼岳＞)', () => {
+    const gj = {
+      features: [{ properties: { '山名＜山頂名＞': '那須岳＜茶臼岳＞', '山名よみ＜山頂名よみ＞': 'なすだけ＜ちゃうすだけ＞', '標高値(m)': 1915 }, geometry: { type: 'Point', coordinates: [139.963, 37.1225] } }],
+    };
+    const { points } = parseElevationFile(new TextEncoder().encode(JSON.stringify(gj)), 'x.geojson');
+    expect(points[0].summitNames).toEqual(['茶臼岳', 'ちゃうすだけ']);
+    const r = matchElevations(points, [t('cha', '茶臼岳', 'ちゃうすだけ', 37.12252, 139.96298), t('nasu', '那須岳', 'なすだけ', 37.1226, 139.9631)], opts);
+    expect(r.elevations.get('cha')).toBe(1915);
+    expect(r.elevations.get('nasu')).toBe(1915);
+  });
+
+  it('accepts a label a few hundred metres from the summit only when no same-name mountain is nearby', () => {
+    const p = pt({ name: '富士山', summitNames: ['剣ヶ峯'], altNames: ['剣ヶ峯'], lat: 35.360738, lon: 138.727373, elevationM: 3776 });
+    const fuji = t('fuji', '富士山', 'ふじさん', 35.362941, 138.73145); // 約 440m
+    const r = matchElevations([p], [fuji, t('other', '富士山', 'ふじさん', 36.3133, 138.1501)], opts);
+    expect(r.elevations.get('fuji')).toBe(3776);
+    expect(r.far).toHaveLength(1);
+    // 同じ名前の山が 3km 以内にもう1つあるなら、遠めの注記は採用しない
+    const twin = t('twin', '富士山', 'ふじさん', 35.37, 138.74);
+    expect(matchElevations([p], [fuji, twin], opts).elevations.size).toBe(0);
+    // 既定（farDistanceM なし）では 150m を超えるものは採用しない
+    expect(matchElevations([p], [fuji], { maxDistanceM: 150 }).elevations.size).toBe(0);
+    // 600m を超えるものは採用しない
+    expect(matchElevations([p], [t('far', '富士山', 'ふじさん', 35.3677, 138.7274)], opts).elevations.size).toBe(0);
+  });
+
+  it('assigns the mountain name of a multi-summit group only to a label right next to one summit (谷川岳)', () => {
+    const g = (summit: string, lat: number, lon: number, elevationM: number) => pt({ name: '谷川岳', summitNames: [summit], altNames: [summit], lat, lon, elevationM });
+    const points = [g('茂倉岳', 36.849166, 138.916666, 1978), g('一ノ倉岳', 36.847111, 138.924363, 1974), g('オキノ耳', 36.837115, 138.930157, 1977)];
+    // 谷川岳の注記がオキノ耳から約150m → オキノ耳の標高
+    expect(matchElevations(points, [t('tani', '谷川岳', 'たにがわだけ', 36.835779, 138.930331)], opts).elevations.get('tani')).toBe(1977);
+    // 注記がどの峰からも 150m 以上離れていれば、どの峰の標高かを決められないので採用しない
+    expect(matchElevations(points, [t('tani', '谷川岳', 'たにがわだけ', 36.8420, 138.9270)], opts).elevations.size).toBe(0);
   });
 });
